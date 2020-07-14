@@ -80,7 +80,7 @@ class TrelloRepeat
 
             for ($i = 0; $i < $d['future']; $i++) {
                 $dayNum++;
-                $carbon = Carbon::createFromFormat('z Y H:i', '0 ' . date('Y') . ' 21:00')->addDays($dayNum - 1);
+                $carbon = Carbon::createFromFormat('z Y H:i', '0 ' . date('Y') . ' 19:00')->addDays($dayNum - 1);
 
                 if ($carbon->gt(Carbon::now()->addDays($d['future']))) {
                     break;
