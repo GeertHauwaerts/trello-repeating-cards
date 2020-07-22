@@ -45,7 +45,58 @@ class TrelloRepeat
         $this->trello = $this->getIdFilter();
         $this->getBoards();
         $this->getCards();
+        $this->processIncrementing();
         $this->processDaily();
+    }
+
+    private function processIncrementing()
+    {
+        foreach ($this->cfg['incrementing'] as $d) {
+            $cardQty = 0;
+            $cardNum = 0;
+            $cardData = [];
+            $regex = '/^' . str_replace('{id}', '(\d+)', $d['name']) .'$/';
+
+            foreach ($this->findCards($d['board'], $regex) as $c) {
+                $card = $this->getCard($d['board'], $c);
+
+                if (!$card) {
+                    $this->error("Unable to fetch the card '{$c}' from the board '{$d['board']}'.");
+                }
+
+                preg_match($regex, $card['name'], $matches);
+
+                if (!isset($matches[1])) {
+                    $this->error("Unable to find the numeric counter from the card '{$card['name']}'.");
+                }
+
+                if ($matches[1] > $cardNum) {
+                    $cardNum = $matches[1];
+                    $cardData = $card;
+                }
+
+                $cardQty++;
+            }
+
+            if (!$cardNum) {
+                $this->error("Unable to find a card with a numeric counter matching '{$d['name']}'.");
+            }
+
+            for ($i = $cardQty; $i < $d['future']; $i++) {
+                $cardNum++;
+
+                $create = [
+                    'name' => str_replace('{id}', $cardNum, $d['name']),
+                    'desc' => $cardData['desc'],
+                    'idBoard' => $cardData['idBoard'],
+                    'idList' => $cardData['idList'],
+                    'idLabels' => implode(',', $cardData['idLabels']),
+                ];
+
+                $this->client->api('cards')->create($create);
+                $this->log("Added a daily card '{$create['name']}'");
+            }
+        }
     }
 
     private function processDaily()
@@ -133,22 +184,29 @@ class TrelloRepeat
     {
         $filter = [];
 
+        $types = [
+            'incrementing',
+            'daily',
+        ];
+
         $required = [
             'name',
             'board',
             'future',
         ];
 
-        foreach ($this->cfg['daily'] as $p) {
-            foreach ($required as $r) {
-                if (!isset($p[$r])) {
-                    $this->error("Missing required parameter '{$r}'.");
-                }
+        foreach ($types as $t) {
+            foreach ($this->cfg[$t] as $p) {
+                foreach ($required as $r) {
+                    if (!isset($p[$r])) {
+                        $this->error("Missing required parameter '{$r}'.");
+                    }
 
-                if (!isset($filter[$p['board']])) {
-                    $filter[$p['board']] = [
-                        'cards' => [],
-                    ];
+                    if (!isset($filter[$p['board']])) {
+                        $filter[$p['board']] = [
+                            'cards' => [],
+                        ];
+                    }
                 }
             }
         }
