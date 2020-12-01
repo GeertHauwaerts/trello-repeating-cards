@@ -47,10 +47,15 @@ class TrelloRepeat
         $this->getCards();
         $this->processIncrementing();
         $this->processDaily();
+        $this->processMonthly();
     }
 
     private function processIncrementing()
     {
+        if (!isset($this->cfg['incrementing'])) {
+            return;
+        }
+
         foreach ($this->cfg['incrementing'] as $d) {
             $cardQty = 0;
             $cardNum = 0;
@@ -101,6 +106,10 @@ class TrelloRepeat
 
     private function processDaily()
     {
+        if (!isset($this->cfg['daily'])) {
+            return;
+        }
+
         foreach ($this->cfg['daily'] as $d) {
             $dayNum = 0;
             $cardData = [];
@@ -152,6 +161,67 @@ class TrelloRepeat
         }
     }
 
+    private function processMonthly()
+    {
+        if (!isset($this->cfg['monthly'])) {
+            return;
+        }
+
+        foreach ($this->cfg['monthly'] as $d) {
+            $monthNum = 0;
+            $cardData = [];
+            $regex = '/^' . str_replace('{id}', '(\d+)', $d['name']) .'$/';
+
+            foreach ($this->findCards($d['board'], $regex) as $c) {
+                $card = $this->getCard($d['board'], $c);
+
+                if (!$card) {
+                    $this->error("Unable to fetch the card '{$c}' from the board '{$d['board']}'.");
+                }
+
+                preg_match($regex, $card['name'], $matches);
+
+                if (!isset($matches[1])) {
+                    $this->error("Unable to find the month counter from the card '{$card['name']}'.");
+                }
+
+                if ($matches[1] > $monthNum) {
+                    $monthNum = $matches[1];
+                    $cardData = $card;
+                }
+            }
+
+            if (!$monthNum) {
+                $this->error("Unable to find a card with a numeric counter matching '{$d['name']}'.");
+            }
+
+            for ($i = 0; $i < $d['future']; $i++) {
+                $monthNum++;
+                $carbon = Carbon::createFromFormat('z Y H:i', '0 ' . date('Y') . ' 19:00')->addMonths($monthNum - 1);
+
+                if ($carbon->gt(Carbon::now()->addMonths($d['future']))) {
+                    break;
+                };
+
+                if ($d['when']) {
+                    $carbon->startOfMonth()->modify($d['when']);
+                }
+
+                $create = [
+                    'name' => str_replace('{id}', $carbon->month, $d['name']),
+                    'desc' => $cardData['desc'],
+                    'idBoard' => $cardData['idBoard'],
+                    'idList' => $cardData['idList'],
+                    'idLabels' => implode(',', $cardData['idLabels']),
+                    'due' => $carbon->format('c'),
+                ];
+
+                $this->client->api('cards')->create($create);
+                $this->log("Added a daily card '{$create['name']}'");
+            }
+        }
+    }
+
     private function getCard($board, $id)
     {
         foreach ($this->trello[$board]['cards'] as $c) {
@@ -187,6 +257,7 @@ class TrelloRepeat
         $types = [
             'incrementing',
             'daily',
+            'monthly',
         ];
 
         $required = [
@@ -196,6 +267,10 @@ class TrelloRepeat
         ];
 
         foreach ($types as $t) {
+            if (!isset($this->cfg[$t])) {
+                continue;
+            }
+
             foreach ($this->cfg[$t] as $p) {
                 foreach ($required as $r) {
                     if (!isset($p[$r])) {

@@ -27,4 +27,12 @@ $app = new TrelloRepeat([
             'future' => 7,
         ],
     ],
+    'monthly' => [
+        [
+            'name' => 'Monthly Finance Check #{id}',
+            'when' => 'Second Monday 7pm',
+            'board' => 'Operations',
+            'future' => 2,
+        ],
+    ],
 ]);
