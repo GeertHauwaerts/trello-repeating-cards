@@ -168,7 +168,6 @@ class TrelloRepeat
         }
 
         foreach ($this->cfg['monthly'] as $d) {
-            $monthNum = 0;
             $cardData = [];
             $regex = '/^' . str_replace('{id}', '(\d+)', $d['name']) .'$/';
 
@@ -185,19 +184,29 @@ class TrelloRepeat
                     $this->error("Unable to find the month counter from the card '{$card['name']}'.");
                 }
 
-                if ($matches[1] > $monthNum) {
-                    $monthNum = $matches[1];
+                if (!$card['due']) {
+                    $this->error("Unable to find the due date from the card '{$card['name']}'.");
+                }
+
+                $cardDate = Carbon::parse($card['due']);
+
+                if (empty($cardData)) {
                     $cardData = $card;
+                } else {
+                    $compareDate = Carbon::parse($cardData['due']);
+
+                    if ($cardDate->gt($compareDate)) {
+                        $cardData = $card;
+                    }
                 }
             }
 
-            if (!$monthNum) {
+            if (empty($cardData)) {
                 $this->error("Unable to find a card with a numeric counter matching '{$d['name']}'.");
             }
 
-            for ($i = 0; $i < $d['future']; $i++) {
-                $monthNum++;
-                $carbon = Carbon::createFromFormat('z Y H:i', '0 ' . date('Y') . ' 19:00')->addMonths($monthNum - 1);
+            for ($i = 1; $i < $d['future']; $i++) {
+                $carbon = Carbon::parse($cardData['due'])->addMonths($i);
 
                 if ($carbon->gt(Carbon::now()->addMonths($d['future']))) {
                     break;
