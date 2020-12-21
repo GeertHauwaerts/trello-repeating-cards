@@ -27,6 +27,13 @@ $app = new TrelloRepeat([
             'future' => 7,
         ],
     ],
+    'weekly' => [
+        [
+            'name' => 'Weekly Progress Report #{id}',
+            'board' => 'Operations',
+            'future' => 2,
+        ],
+    ],
     'monthly' => [
         [
             'name' => 'Monthly Finance Check #{id}',
