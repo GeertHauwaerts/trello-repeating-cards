@@ -99,7 +99,7 @@ class TrelloRepeat
                 ];
 
                 $this->client->api('cards')->create($create);
-                $this->log("Added a daily card '{$create['name']}'");
+                $this->log("Added an incrementing card '{$create['name']}'");
             }
         }
     }
@@ -145,6 +145,11 @@ class TrelloRepeat
                 if ($carbon->gt(Carbon::now()->addDays($d['future']))) {
                     break;
                 };
+
+                if ($carbon->isWeekend() && isset($d['weekend']) && $d['weekend'] === false) {
+                    $d['future']++;
+                    continue;
+                }
 
                 $create = [
                     'name' => str_replace('{id}', $dayNum, $d['name']),
