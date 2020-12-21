@@ -42,4 +42,11 @@ $app = new TrelloRepeat([
             'future' => 2,
         ],
     ],
+    'yearly' => [
+        [
+            'name' => 'Domain Renewal - {uid} - {id}',
+            'board' => 'Operations',
+            'future' => 2,
+        ],
+    ],
 ]);

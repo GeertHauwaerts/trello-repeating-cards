@@ -49,6 +49,7 @@ class TrelloRepeat
         $this->processDaily();
         $this->processWeekly();
         $this->processMonthly();
+        $this->processYearly();
     }
 
     private function processIncrementing()
@@ -303,6 +304,74 @@ class TrelloRepeat
         }
     }
 
+    private function processYearly()
+    {
+        if (!isset($this->cfg['yearly'])) {
+            return;
+        }
+
+        foreach ($this->cfg['yearly'] as $d) {
+            $cardData = [];
+            $regex = '/^' . str_replace('{id}', '(\d+)', $d['name']) .'$/';
+            $regex = str_replace('{uid}', '(\S+)', $regex);
+
+            foreach ($this->findCards($d['board'], $regex) as $c) {
+                $card = $this->getCard($d['board'], $c);
+
+                if (!$card) {
+                    $this->error("Unable to fetch the card '{$c}' from the board '{$d['board']}'.");
+                }
+
+                preg_match($regex, $card['name'], $matches);
+
+                if (!isset($matches[2])) {
+                    $this->error("Unable to find the year counter from the card '{$card['name']}'.");
+                }
+
+                if (!$card['due']) {
+                    $this->error("Unable to find the due date from the card '{$card['name']}'.");
+                }
+
+                $cardDate = Carbon::parse($card['due']);
+
+                if (empty($cardData[$matches[1]])) {
+                    $cardData[$matches[1]] = $card;
+                } else {
+                    $compareDate = Carbon::parse($cardData[$matches[1]]['due']);
+
+                    if ($cardDate->gt($compareDate)) {
+                        $cardData[$matches[1]] = $card;
+                    }
+                }
+            }
+
+            foreach ($cardData as $uid => $data) {
+                for ($i = 1; $i < $d['future']; $i++) {
+                    $carbon = Carbon::parse($data['due'])->addYears($i);
+
+                    if ($carbon->gt(Carbon::now()->addYears($d['future']))) {
+                        break;
+                    };
+
+                    $name = str_replace('{id}', $carbon->year, $d['name']);
+                    $name = str_replace('{uid}', $uid, $d['name']);
+
+                    $create = [
+                        'name' => $name,
+                        'desc' => $data['desc'],
+                        'idBoard' => $data['idBoard'],
+                        'idList' => $data['idList'],
+                        'idLabels' => implode(',', $data['idLabels']),
+                        'due' => $carbon->format('c'),
+                    ];
+
+                    $this->client->api('cards')->create($create);
+                    $this->log("Added a yearly card '{$create['name']}'");
+                }
+            }
+        }
+    }
+
     private function getCard($board, $id)
     {
         foreach ($this->trello[$board]['cards'] as $c) {
@@ -340,6 +409,7 @@ class TrelloRepeat
             'daily',
             'weekly',
             'monthly',
+            'yearly',
         ];
 
         $required = [
