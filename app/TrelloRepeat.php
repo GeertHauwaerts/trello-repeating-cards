@@ -354,7 +354,7 @@ class TrelloRepeat
                     };
 
                     $name = str_replace('{id}', $carbon->year, $d['name']);
-                    $name = str_replace('{uid}', $uid, $d['name']);
+                    $name = str_replace('{uid}', $uid, $name);
 
                     $create = [
                         'name' => $name,
