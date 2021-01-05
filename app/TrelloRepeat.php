@@ -113,7 +113,6 @@ class TrelloRepeat
         }
 
         foreach ($this->cfg['daily'] as $d) {
-            $dayNum = 0;
             $cardData = [];
             $regex = '/^' . str_replace('{id}', '(\d+)', $d['name']) .'$/';
 
@@ -130,19 +129,29 @@ class TrelloRepeat
                     $this->error("Unable to find the day counter from the card '{$card['name']}'.");
                 }
 
-                if ($matches[1] > $dayNum) {
-                    $dayNum = $matches[1];
+                if (!$card['due']) {
+                    $this->error("Unable to find the due date from the card '{$card['name']}'.");
+                }
+
+                $cardDate = Carbon::parse($card['due']);
+
+                if (empty($cardData)) {
                     $cardData = $card;
+                } else {
+                    $compareDate = Carbon::parse($cardData['due']);
+
+                    if ($cardDate->gt($compareDate)) {
+                        $cardData = $card;
+                    }
                 }
             }
 
-            if (!$dayNum) {
+            if (empty($cardData)) {
                 $this->error("Unable to find a card with a numeric counter matching '{$d['name']}'.");
             }
 
-            for ($i = 0; $i < $d['future']; $i++) {
-                $dayNum++;
-                $carbon = Carbon::createFromFormat('z Y H:i', '0 ' . date('Y') . ' 19:00')->addDays($dayNum - 1);
+            for ($i = 1; $i < $d['future']; $i++) {
+                $carbon = Carbon::parse($cardData['due'])->addDays($i);
 
                 if ($carbon->gt(Carbon::now()->addDays($d['future']))) {
                     break;
@@ -154,7 +163,7 @@ class TrelloRepeat
                 }
 
                 $create = [
-                    'name' => str_replace('{id}', $dayNum, $d['name']),
+                    'name' => str_replace('{id}', $carbon->dayOfYear, $d['name']),
                     'desc' => $cardData['desc'],
                     'idBoard' => $cardData['idBoard'],
                     'idList' => $cardData['idList'],
