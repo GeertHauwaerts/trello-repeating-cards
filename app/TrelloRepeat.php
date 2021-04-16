@@ -186,6 +186,7 @@ class TrelloRepeat
         foreach ($this->cfg['weekly'] as $d) {
             $cardData = [];
             $regex = '/^' . str_replace('{id}', '(\d+)', $d['name']) .'$/';
+            $regex = str_replace('{uid}', '(.*)', $regex);
 
             foreach ($this->findCards($d['board'], $regex) as $c) {
                 $card = $this->getCard($d['board'], $c);
