@@ -185,6 +185,14 @@ class TrelloRepeat
 
         foreach ($this->cfg['weekly'] as $d) {
             $cardData = [];
+            $checkPos = 1;
+            $hasUid = false;
+
+            if (strpos($d['name'], '{uid}') !== false) {
+                $hasUid = true;
+                $checkPos = 2;
+            }
+
             $regex = '/^' . str_replace('{id}', '(\d+)', $d['name']) .'$/';
             $regex = str_replace('{uid}', '(.*)', $regex);
 
@@ -197,7 +205,7 @@ class TrelloRepeat
 
                 preg_match($regex, $card['name'], $matches);
 
-                if (!isset($matches[1])) {
+                if (!isset($matches[$checkPos])) {
                     $this->error("Unable to find the week counter from the card '{$card['name']}'.");
                 }
 
@@ -206,14 +214,19 @@ class TrelloRepeat
                 }
 
                 $cardDate = Carbon::parse($card['due']);
+                $idx = $regex;
 
-                if (empty($cardData)) {
-                    $cardData = $card;
+                if ($hasUid) {
+                    $idx = $matches[1];
+                }
+
+                if (empty($cardData[$idx])) {
+                    $cardData[$idx] = $card;
                 } else {
-                    $compareDate = Carbon::parse($cardData['due']);
+                    $compareDate = Carbon::parse($cardData[$idx]['due']);
 
                     if ($cardDate->gt($compareDate)) {
-                        $cardData = $card;
+                        $cardData[$idx] = $card;
                     }
                 }
             }
@@ -222,24 +235,30 @@ class TrelloRepeat
                 $this->error("Unable to find a card with a numeric counter matching '{$d['name']}'.");
             }
 
-            for ($i = 1; $i < $d['future']; $i++) {
-                $carbon = Carbon::parse($cardData['due'])->addWeeks($i);
+            foreach ($cardData as $uid => $data) {
+                for ($i = 1; $i < $d['future']; $i++) {
+                    $carbon = Carbon::parse($data['due'])->addWeeks($i);
 
-                if ($carbon->gt(Carbon::now()->addWeeks($d['future']))) {
-                    break;
-                };
+                    if ($carbon->gt(Carbon::now()->addWeeks($d['future']))) {
+                        break;
+                    };
 
-                $create = [
-                    'name' => str_replace('{id}', $carbon->weekOfYear, $d['name']),
-                    'desc' => $cardData['desc'],
-                    'idBoard' => $cardData['idBoard'],
-                    'idList' => $cardData['idList'],
-                    'idLabels' => implode(',', $cardData['idLabels']),
-                    'due' => $carbon->format('c'),
-                ];
+                    $name = str_replace('{id}', $carbon->weekOfYear, $d['name']);
+                    $name = str_replace('{uid}', $uid, $name);
 
-                $this->client->api('cards')->create($create);
-                $this->log("Added a weekly card '{$create['name']}' @ {$carbon->format('Y-m-d H:i:s')}");
+                    $create = [
+                        'name' => $name,
+                        'desc' => $data['desc'],
+                        'idBoard' => $data['idBoard'],
+                        'idList' => $data['idList'],
+                        'idLabels' => implode(',', $data['idLabels']),
+                        'due' => $carbon->format('c'),
+                    ];
+
+                    $newCard = $this->client->api('cards')->create($create);
+                    $this->copyCheckList($data['idChecklists'], $newCard['id']);
+                    $this->log("Added a weekly card '{$create['name']}' @ {$carbon->format('Y-m-d H:i:s')}");
+                }
             }
         }
     }
@@ -486,5 +505,18 @@ class TrelloRepeat
     private function log($msg)
     {
         echo'[' . date('Y-m-d H:i:s') . "] {$msg}\n";
+    }
+
+    private function copyCheckList($checklists, $card)
+    {
+        foreach ($checklists as $cl) {
+            $clData = $this->client->api('checklists')->show($cl);
+
+            $this->client->api('checklists')->create([
+                'name' => $clData['name'],
+                'idChecklistSource' => $clData['id'],
+                'idCard' => $card,
+            ]);
+        }
     }
 }

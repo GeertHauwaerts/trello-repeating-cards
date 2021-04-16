@@ -33,6 +33,11 @@ $app = new TrelloRepeat([
             'board' => 'Operations',
             'future' => 2,
         ],
+        [
+            'name' => 'Weekly Sync - {uid} #{id}',
+            'board' => 'Operations',
+            'future' => 2,
+        ],
     ],
     'monthly' => [
         [
