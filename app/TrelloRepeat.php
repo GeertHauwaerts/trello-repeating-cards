@@ -45,6 +45,7 @@ class TrelloRepeat
         $this->trello = $this->getIdFilter();
         $this->getBoards();
         $this->getCards();
+        $this->getLists();
         $this->processIncrementing();
         $this->processDaily();
         $this->processWeekly();
@@ -201,6 +202,20 @@ class TrelloRepeat
 
                 if (!$card) {
                     $this->error("Unable to fetch the card '{$c}' from the board '{$d['board']}'.");
+                }
+
+                if (isset($d['list'])) {
+                    $list = $this->getListByName($d['board'], "/^{$d['list']}$/");
+
+                    if ($list === null) {
+                        $this->error(
+                            "Unable to fetch the card '{$c}' from the board '{$d['board']}' list '{$d['name']}'."
+                        );
+                    }
+
+                    if ($card['idList'] !== $list['id']) {
+                        continue;
+                    }
                 }
 
                 preg_match($regex, $card['name'], $matches);
@@ -429,6 +444,36 @@ class TrelloRepeat
         return $cards;
     }
 
+    private function getListByName($board, $filter): ?array
+    {
+        if (!isset($this->trello[$board])) {
+            return null;
+        }
+
+        foreach ($this->trello[$board]['lists'] as $l) {
+            if (preg_match($filter, $l['name'])) {
+                return $l;
+            }
+        }
+
+        return null;
+    }
+
+    private function getListById($board, $id): ?array
+    {
+        if (!isset($this->trello[$board])) {
+            return null;
+        }
+
+        foreach ($this->trello[$board]['lists'] as $l) {
+            if ($id === $l['id']) {
+                return $l;
+            }
+        }
+
+        return null;
+    }
+
     private function getIdFilter()
     {
         $filter = [];
@@ -493,6 +538,13 @@ class TrelloRepeat
     {
         foreach ($this->trello as $b => $d) {
             $this->trello[$b]['cards'] = $this->client->api('boards')->cards()->all($d['data']['id']);
+        }
+    }
+
+    private function getLists()
+    {
+        foreach ($this->trello as $b => $d) {
+            $this->trello[$b]['lists'] = $this->client->boards()->lists()->all($d['data']['id']);
         }
     }
 
