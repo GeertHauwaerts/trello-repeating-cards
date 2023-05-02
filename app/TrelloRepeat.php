@@ -366,6 +366,20 @@ class TrelloRepeat
                     $this->error("Unable to fetch the card '{$c}' from the board '{$d['board']}'.");
                 }
 
+                if (isset($d['list'])) {
+                    $list = $this->getListByName($d['board'], "/^{$d['list']}$/");
+
+                    if ($list === null) {
+                        $this->error(
+                            "Unable to fetch the card '{$c}' from the board '{$d['board']}' list '{$d['name']}'."
+                        );
+                    }
+
+                    if ($card['idList'] !== $list['id']) {
+                        continue;
+                    }
+                }
+
                 preg_match($regex, $card['name'], $matches);
 
                 if (!isset($matches[2])) {
