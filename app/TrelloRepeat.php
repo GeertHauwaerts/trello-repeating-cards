@@ -3,8 +3,7 @@
 namespace App;
 
 use Carbon\Carbon;
-use Trello\Client;
-use Trello\Manager;
+use Semaio\TrelloApi\ClientBuilder;
 
 class TrelloRepeat
 {
@@ -15,7 +14,7 @@ class TrelloRepeat
     public function __construct($cfg = [])
     {
         $this->cfg = $cfg;
-        $this->client = new Client();
+        $this->client = new ClientBuilder();
         $this->authenticate();
         $this->setTrello();
     }
@@ -33,10 +32,9 @@ class TrelloRepeat
             }
         }
 
-        $this->client->authenticate(
+        $this->client = $this->client->build(
             $_ENV['TRELLO_API_KEY'],
             $_ENV['TRELLO_API_TOKEN'],
-            Client::AUTH_URL_CLIENT_ID
         );
     }
 
@@ -101,7 +99,7 @@ class TrelloRepeat
                     'idLabels' => implode(',', $cardData['idLabels']),
                 ];
 
-                $this->client->api('cards')->create($create);
+                $this->client->getCardApi()->create($create);
                 $this->log("Added an incrementing card '{$create['name']}'");
             }
         }
@@ -172,7 +170,7 @@ class TrelloRepeat
                     'due' => $carbon->format('c'),
                 ];
 
-                $this->client->api('cards')->create($create);
+                $this->client->getCardApi()->create($create);
                 $this->log("Added a daily card '{$create['name']}'");
             }
         }
@@ -270,7 +268,7 @@ class TrelloRepeat
                         'due' => $carbon->format('c'),
                     ];
 
-                    $newCard = $this->client->api('cards')->create($create);
+                    $newCard = $this->client->getCardApi()->create($create);
                     $this->copyCheckList($data['idChecklists'], $newCard['id']);
                     $this->log("Added a weekly card '{$create['name']}' @ {$carbon->format('Y-m-d H:i:s')}");
                 }
@@ -342,7 +340,7 @@ class TrelloRepeat
                     'due' => $carbon->format('c'),
                 ];
 
-                $this->client->api('cards')->create($create);
+                $this->client->getCardApi()->create($create);
                 $this->log("Added a monthly card '{$create['name']}'");
             }
         }
@@ -423,7 +421,7 @@ class TrelloRepeat
                         'due' => $carbon->format('c'),
                     ];
 
-                    $this->client->api('cards')->create($create);
+                    $this->client->getCardApi()->create($create);
                     $this->log("Added a yearly card '{$create['name']}'");
                 }
             }
@@ -531,7 +529,7 @@ class TrelloRepeat
 
     private function getBoards()
     {
-        $boards = $this->client->api('member')->boards()->all('me');
+        $boards = $this->client->getMemberApi()->boards()->all('me');
 
         foreach ($boards as $b) {
             if (!isset($this->trello[$b['name']])) {
@@ -551,14 +549,14 @@ class TrelloRepeat
     private function getCards()
     {
         foreach ($this->trello as $b => $d) {
-            $this->trello[$b]['cards'] = $this->client->api('boards')->cards()->all($d['data']['id']);
+            $this->trello[$b]['cards'] = $this->client->getBoardApi()->cards()->all($d['data']['id']);
         }
     }
 
     private function getLists()
     {
         foreach ($this->trello as $b => $d) {
-            $this->trello[$b]['lists'] = $this->client->boards()->lists()->all($d['data']['id']);
+            $this->trello[$b]['lists'] = $this->client->getBoardApi()->lists()->all($d['data']['id']);
         }
     }
 
@@ -576,9 +574,9 @@ class TrelloRepeat
     private function copyCheckList($checklists, $card)
     {
         foreach ($checklists as $cl) {
-            $clData = $this->client->api('checklists')->show($cl);
+            $clData = $this->client->getChecklistApi()->show($cl);
 
-            $this->client->api('checklists')->create([
+            $this->client->getChecklistApi()->create([
                 'name' => $clData['name'],
                 'idChecklistSource' => $clData['id'],
                 'idCard' => $card,
