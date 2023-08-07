@@ -253,7 +253,6 @@ class TrelloRepeat
                     $carbon = Carbon::parse($data['due'])->addWeeks($i);
 
                     if ($carbon->gt(Carbon::now()->addWeeks($d['future']))) {
-                        echo "HERE\n";
                         break;
                     };
 
